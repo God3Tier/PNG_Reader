@@ -52,13 +52,15 @@ impl TryFrom<[u8; 4]> for ChunkType {
     type Error = Error;
     
     fn try_from(bytes: [u8; 4]) -> Result<Self> {
+        // println!("chunk type is {:?}", String::from_utf8(bytes.try_into().unwrap()));
         for b in bytes {
-            if !(b >= 65 && b <= 90) && !(b >= 97 && b <= 122) {
+            if !(b >= 65 && b <= 90) && !(b >= 97 && b <= 122) && b != 32{
                 return Err(format!("Not a letter for {b}").into());
             }
         }
         
         if bytes[2] & 0x20 != 0 {
+            // println!("Called for {:?}", String::from_utf8(bytes.try_into().unwrap()));
             return Err("Invalid bit placement".into())
         }
         

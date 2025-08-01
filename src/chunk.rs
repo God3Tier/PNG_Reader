@@ -6,48 +6,34 @@ use crate::chunk_type::ChunkType;
 
 pub const CRC_PNG: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 
-struct Chunk {
-    length: u32,
-    chunk_type: ChunkType,
-    chunk_data: Vec<u8>,
-    crc: u32,
+#[derive(PartialEq, Clone)]
+pub struct Chunk {
+    length: u32, // 4 bytes 
+    chunk_type: ChunkType, // 4 bytes 
+    chunk_data: Vec<u8>, // explained by length 
+    crc: u32, // 4 bytes 
 }
 
 impl TryFrom<&[u8]> for Chunk {
     type Error = Error;
     
     fn try_from(chunk_data: &[u8]) -> Result<Self> {
-        let c_type_bytes:[u8; 4] = chunk_data[4..8].try_into().unwrap_or_else(|e| {
-            panic!("Incorrect chunktype");
-        });
-        
-        let mut length: u32 = 0;
-        
-        for i in &chunk_data[0..4] {
-            length += *i as u32;
+        let c_type_bytes = chunk_data[4..8].try_into();
+        if c_type_bytes.is_err() {
+            return Err("Too small".into());
         }
+        let c_type_bytes:[u8; 4] = c_type_bytes.unwrap();
+        
+        let length: u32 = u32::from_be_bytes(chunk_data[0..4].try_into().unwrap());
 
         match ChunkType::try_from(c_type_bytes) {
             Ok(chunk_type) => {
-                // let message: Vec<u8> = chunk_type.bytes()
-                //     .iter()
-                //     .cloned()
-                //     .chain(chunk_data.iter().map(|&x| x))
-                //     .collect();
-                let mut buf: [u8; 4] = [0; 4];
-                let mut indx: usize = 0;
-                
-                for i in chunk_data[chunk_data.len() - 4..].iter() {
-                    buf[indx] = *i;
-                    indx += 1;
-                }
-                
-                let crc = u32::from_be_bytes(buf);
+                let crc = u32::from_be_bytes(chunk_data[8 + length as usize..12 + length as usize].try_into().unwrap());
     
                 return Ok(Chunk{
                     chunk_type: chunk_type,
                     length: length,
-                    chunk_data: chunk_data[8..chunk_data.len() - 4].iter().map(|&x| x).collect::<Vec<u8>>(),
+                    chunk_data: chunk_data[8..8 + length as usize].iter().map(|&x| x).collect::<Vec<u8>>(),
                     crc: crc
                 })
             },

@@ -1,20 +1,139 @@
-use crate::chunk::CHUNK;
+use crate::chunk::Chunk;
+use crate::chunk_type::ChunkType;
 use std::{convert::TryFrom, fmt::{Display, Formatter}, str::FromStr};
+use crate::Error;
+use crate::Result;
 
-struct Png {
-    valid_bytes: [u8; 8],
-    chunk: Chunk
+pub struct Png {
+    header: [u8; 8],
+    chunks: Vec<Chunk>
 }
 
 impl Png {
+    pub const STANDARD_HEADER: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
     
+    pub fn from_chunks(chunks: Vec<Chunk>) -> Png {
+        let send: Vec<u8> = Png::STANDARD_HEADER.iter()
+            .map(|&x| x)
+            .chain(chunks.iter().flat_map(|chunk| {
+                let bytes = u32::to_be_bytes(chunk.length()).iter().map(|&x| x)
+                    .chain(chunk.chunk_type().bytes())
+                    .chain(chunk.as_bytes().iter().map(|&x| x))
+                    .chain(u32::to_be_bytes(chunk.crc()))
+                    .collect::<Vec<u8>>();
+                bytes
+            }))
+            .collect();
+        let send: &[u8] = &send;
+        Png::try_from(send).unwrap()
+    }
+    
+    pub fn append_chunk(&mut self, chunk: Chunk) {
+        self.chunks.push(chunk);
+    }
+    
+    pub fn remove_first_chunk(&mut self, chunk_type: &str) -> Result<Chunk> {
+        let bytes:[u8; 4] = chunk_type.as_bytes().try_into().unwrap();
+        match ChunkType::try_from(bytes) {
+            Ok(chunk_type) => {
+                let mut target_chunk: Option<Chunk> = None;
+                for chunk in self.chunks.clone() {
+                    if chunk.chunk_type() == chunk_type {
+                        target_chunk = Some(chunk);
+                        break;
+                    }
+                }
+                
+                let target_chunk = target_chunk.unwrap();
+                match self.chunks().iter().position(|ch| *ch == target_chunk) {
+                    Some(indx) => {
+                        let res = self.chunks.remove(indx);
+                        return Ok(res);
+                    }, 
+                    None => return Err("Chunktype not found".into())
+                }
+            }, 
+            Err(_) => return Err("Incorrect chunktype".into())
+        }
+    }
+    
+    pub fn chunks(&self) -> &[Chunk]{
+        &self.chunks
+    }
+    
+    pub fn header(&self) -> &[u8; 8] {
+        &self.header
+    }
+    
+    
+    pub fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
+        let chunk_type_bytes:[u8; 4] = chunk_type.as_bytes().try_into().unwrap();
+        match ChunkType::try_from(chunk_type_bytes) {
+            Ok(chunktype) => {
+                for chunk in &self.chunks {
+                    if chunk.chunk_type() == chunktype {
+                        return Some(chunk);
+                    }
+                }
+            }, 
+            Err(_) => return None
+        };
+        None
+    }
+    
+    pub fn as_bytes(&self) -> Vec<u8> {
+        return self.header().iter()
+            .map(|&x| x)
+            .chain(self.chunks.iter().flat_map(|chunk| {
+                let bytes = u32::to_be_bytes(chunk.length()).iter().map(|&x| x)
+                    .chain(chunk.chunk_type().bytes())
+                    .chain(chunk.as_bytes().iter().map(|&x| x))
+                    .chain(u32::to_be_bytes(chunk.crc()))
+                    .collect::<Vec<u8>>();
+                bytes
+            }))
+            .collect::<Vec<u8>>();
+    }
 }
 
 impl TryFrom<&[u8]> for Png {
     type Error = Error;
     
     fn try_from(bytes: &[u8]) -> Result<Self> {
+        let header:[u8; 8] = bytes[0..8].try_into().unwrap();
         
+        if header != Png::STANDARD_HEADER {
+            return Err("Incorrect initial bytes".into());
+        }
+        
+        let mut chunks = Vec::new();
+        let remaining_bytes: &[u8] = &bytes[8..];
+        
+        let mut indx = 0;
+        while remaining_bytes.len() > indx {
+            match Chunk::try_from(&remaining_bytes[indx..]) {
+                Ok(chunk) => {
+                    let len = chunk.length();
+                    indx += len as usize + 12; // 12 -> 4 bytes for len, 4 bytes for chunktype, 4 bytes for crc 
+                    chunks.push(chunk);
+                    // println!("Success first chunk");
+                }, 
+                Err(e) => return Err(format!("Invalid chunk found because of {}", e).into())
+            }
+        }
+        
+        Ok(Png {
+            header: header,
+            chunks: chunks
+        })
+    }
+}
+
+impl Display for Png {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        let _ = write!(f, "{:?}\n", self.header).unwrap();
+        self.chunks().iter().for_each(|chunk| write!(f, "{:?}\n", chunk.data()).unwrap());
+        return Ok(());
     }
 }
 
@@ -60,7 +179,14 @@ mod tests {
     fn test_valid_from_bytes() {
         let chunk_bytes: Vec<u8> = testing_chunks()
             .into_iter()
-            .flat_map(|chunk| chunk.as_bytes())
+            .flat_map(|chunk| {
+                let bytes = u32::to_be_bytes(chunk.length()).iter().map(|&x| x)
+                    .chain(chunk.chunk_type().bytes())
+                    .chain(chunk.as_bytes().iter().map(|&x| x))
+                    .chain(u32::to_be_bytes(chunk.crc()))
+                    .collect::<Vec<u8>>();
+                bytes
+            })
             .collect();
 
         let bytes: Vec<u8> = Png::STANDARD_HEADER
@@ -70,7 +196,6 @@ mod tests {
             .collect();
 
         let png = Png::try_from(bytes.as_ref());
-
         assert!(png.is_ok());
     }
 
@@ -167,7 +292,14 @@ mod tests {
     fn test_png_trait_impls() {
         let chunk_bytes: Vec<u8> = testing_chunks()
             .into_iter()
-            .flat_map(|chunk| chunk.as_bytes())
+            .flat_map(|chunk| {
+                let bytes = u32::to_be_bytes(chunk.length()).iter().map(|&x| x)
+                    .chain(chunk.chunk_type().bytes())
+                    .chain(chunk.as_bytes().iter().map(|&x| x))
+                    .chain(u32::to_be_bytes(chunk.crc()))
+                    .collect::<Vec<u8>>();
+                bytes
+            })
             .collect();
 
         let bytes: Vec<u8> = Png::STANDARD_HEADER
@@ -175,7 +307,14 @@ mod tests {
             .chain(chunk_bytes.iter())
             .copied()
             .collect();
-
+        for b in &bytes {
+            if (b'A'..=b'Z').contains(&b) || (b'a'..=b'z').contains(&b) {
+                print!("{}", *b as char); 
+            } else {
+                print!("{b}");
+            }
+        }
+        println!("");
         let png: Png = TryFrom::try_from(bytes.as_ref()).unwrap();
 
         let _png_string = format!("{}", png);
@@ -428,4 +567,4 @@ mod tests {
         160, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
     ];
 }
-}
+
