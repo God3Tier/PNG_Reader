@@ -28,7 +28,13 @@ impl TryFrom<&[u8]> for Chunk {
 
         match ChunkType::try_from(c_type_bytes) {
             Ok(chunk_type) => {
-                let crc = u32::from_be_bytes(chunk_data[8 + length as usize..12 + length as usize].try_into().unwrap());
+                let crc = u32::from_be_bytes(chunk_data[8 + length as usize..12 + length as usize].try_into().unwrap_or_else(|_| {
+                    let val = chunk_type.bytes().iter()
+                        .map(|&x| x)
+                        .chain(chunk_data[8..8 + length as usize].iter().map(|&x| x))
+                        .collect::<Vec<u8>>();
+                    u32::to_be_bytes(CRC_PNG.checksum(&val))
+                }));
     
                 return Ok(Chunk{
                     chunk_type: chunk_type,

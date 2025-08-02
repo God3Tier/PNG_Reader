@@ -1,3 +1,5 @@
+use std::env::{self, args};
+
 mod args;
 mod chunk;
 mod chunk_type;
@@ -7,52 +9,52 @@ mod png;
 pub type Error = Box<dyn std::error::Error>;
 pub type Result<T> = std::result::Result<T, Error>;
 
-fn testing_chunks() -> Vec<chunk::Chunk> {
-    vec![
-        chunk_from_strings("FrSt", "I am the first chunk").unwrap(),
-        chunk_from_strings("miDl", "I am another chunk").unwrap(),
-        chunk_from_strings("LASt", "I am the last chunk").unwrap(),
-    ]
-}
-fn testing_png() -> png::Png {
-    let chunks = testing_chunks();
-    let png = png::Png::from_chunks(chunks);
-    // println!("png success");
-    return png
-}
-
-fn chunk_from_strings(chunk_type: &str, data: &str) -> Result<chunk::Chunk> {
-    use std::str::FromStr;
-
-    let chunk_type = chunk_type::ChunkType::from_str(chunk_type)?;
-    let data: Vec<u8> = data.bytes().collect();
-    Ok(chunk::Chunk::new(chunk_type, data))
-}
-
-// fn print_png() {
-//     for x in PNG_FILE {
-//         if !(x >= 65 && x <= 90) && !(x >= 97 && x <= 122) {
-//             print!("{}", x.to_string());
-//         }
-    
-//         print!("{}", x as char);
-//     }
-// }
-
-fn test_chunk_types() {
-    let bytes:[u8; 4] = "FrST".as_bytes().try_into().unwrap();
-    chunk_type::ChunkType::try_from(bytes);
-    println!("Valid 1 ");
-    let bytes:[u8; 4] = "miDl".as_bytes().try_into().unwrap();
-    chunk_type::ChunkType::try_from(bytes);
-    println!("Valid 2 ");
-    let bytes:[u8; 4] = "LASt".as_bytes().try_into().unwrap();
-    chunk_type::ChunkType::try_from(bytes);
-    println!("Valid");
-}
-
 fn main() -> Result<()> {
-    // test_chunk_types();
-    testing_png();
+    let input: Vec<String> = args().collect();
+    
+    for s in &input {
+        println!("{s}");
+    }
+    
+    match input[1].to_lowercase().as_str() {
+        "encode" =>  {
+            if input.len() < 5 {
+                return Err("Not enough arguments".into());
+            }
+            let mut args = args::Args::new(input[2].as_str(), args::PngArgs::Encode(input[3].clone(), input[4].clone()));
+            match args.encode() {
+                Ok(_) => println!("Message encoded successfully"),
+                Err(e) => return Err(format!("Unable to encode message because of {}", e).into())
+            }
+        }, 
+        "decode" => {
+            if input.len() < 4 {
+                return Err("Not enough arguments".into());
+            }
+            let mut args = args::Args::new(input[2].as_str(), args::PngArgs::Decode(input[3].clone()));
+            match args.encode() {
+                Ok(message) => println!("Message decoded successfully: Message is \n {:?}", message),
+                Err(e) => return Err(format!("Unable to decode message because of {}", e).into())
+            }
+        }, 
+        "delete" => {
+            if input.len() < 4 {
+                return Err("Not enough arguments".into());
+            }
+            let mut args = args::Args::new(input[2].as_str(), args::PngArgs::Delete(input[3].clone()));
+            match args.encode() {
+                Ok(_) => println!("Message deleted successfully"),
+                Err(e) => return Err(format!("Unable to delete message because of {}", e).into())
+            }
+        }, 
+        "print" => {
+            if input.len() < 3 {
+                return Err("Not enough arguments".into());
+            }
+            let args = args::Args::new(input[2].as_str(), args::PngArgs::Print());
+            args.print();
+        }, 
+        _ => return Err("Invalid command".into())
+    }
     Ok({})
 }

@@ -197,6 +197,7 @@ mod tests {
 
         let png = Png::try_from(bytes.as_ref());
         assert!(png.is_ok());
+        assert!(false);
     }
 
     #[test]
