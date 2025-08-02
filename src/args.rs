@@ -26,7 +26,7 @@ impl Args {
         let bytes = fs::read(file_path).unwrap();
         let bytes: &[u8] = &bytes;
         let png = Png::try_from(bytes).unwrap();
-        
+        println!("Successfully created args"); 
         Args {
             png: png, 
             func: func,
@@ -37,10 +37,12 @@ impl Args {
     pub fn encode(&mut self)-> Result<()> {
         match &self.func {
             PngArgs::Encode(chunk_type, message) => {
-                let bytes = chunk_type.bytes().into_iter()
+                let bytes = u32::to_be_bytes(message.len() as u32).iter().map(|&x| x)
+                    .chain(chunk_type.bytes().into_iter())
                     .chain(message.bytes().into_iter())
                     .collect::<Vec<u8>>();
                 let bytes: &[u8] = &bytes;
+                // println!("{:?}", bytes);
                 match Chunk::try_from(bytes) {
                     Ok(chunk) => {
                         let bytes = u32::to_be_bytes(chunk.length()).iter()
@@ -84,9 +86,9 @@ impl Args {
         }
     }
     
-    pub fn remove(&mut self) -> Result<()>{
+    pub fn delete(&mut self) -> Result<()>{
         match &self.func  {
-            PngArgs::Decode(chunk_type) => {
+            PngArgs::Delete(chunk_type) => {
                 match self.png.remove_first_chunk(chunk_type) {
                     Ok(_) => {
                         let mut file = File::create(self.file_path.clone()).unwrap();

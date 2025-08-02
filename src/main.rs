@@ -11,11 +11,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 fn main() -> Result<()> {
     let input: Vec<String> = args().collect();
-    
-    for s in &input {
-        println!("{s}");
-    }
-    
+
     match input[1].to_lowercase().as_str() {
         "encode" =>  {
             if input.len() < 5 {
@@ -31,10 +27,10 @@ fn main() -> Result<()> {
             if input.len() < 4 {
                 return Err("Not enough arguments".into());
             }
-            let mut args = args::Args::new(input[2].as_str(), args::PngArgs::Decode(input[3].clone()));
-            match args.encode() {
-                Ok(message) => println!("Message decoded successfully: Message is \n {:?}", message),
-                Err(e) => return Err(format!("Unable to decode message because of {}", e).into())
+            let args = args::Args::new(input[2].as_str(), args::PngArgs::Decode(input[3].clone()));
+            match args.decode() {
+                Some(message) => println!("Message decoded successfully: Message is \n {:?}", message),
+                None => return Err(format!("Message doesnt exist").into())
             }
         }, 
         "delete" => {
@@ -42,7 +38,7 @@ fn main() -> Result<()> {
                 return Err("Not enough arguments".into());
             }
             let mut args = args::Args::new(input[2].as_str(), args::PngArgs::Delete(input[3].clone()));
-            match args.encode() {
+            match args.delete() {
                 Ok(_) => println!("Message deleted successfully"),
                 Err(e) => return Err(format!("Unable to delete message because of {}", e).into())
             }

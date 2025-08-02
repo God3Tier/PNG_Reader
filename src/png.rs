@@ -118,7 +118,7 @@ impl TryFrom<&[u8]> for Png {
                     chunks.push(chunk);
                     // println!("Success first chunk");
                 }, 
-                Err(e) => return Err(format!("Invalid chunk found because of {}", e).into())
+                Err(e) => return Err(format!("Invalid chunk found because of {}", e).into()),
             }
         }
         
@@ -197,7 +197,7 @@ mod tests {
 
         let png = Png::try_from(bytes.as_ref());
         assert!(png.is_ok());
-        assert!(false);
+        // assert!(false);
     }
 
     #[test]
