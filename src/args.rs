@@ -107,7 +107,7 @@ impl Args {
     pub fn print(&self) {
         println!("{:?}", self.png.header());
         for chunk in self.png.chunks() {
-            println!("ChunkType : {}, Message: {:?}", chunk.chunk_type(), String::from_utf8(chunk.as_bytes().to_vec()));
+            println!("{}", chunk);
         }
     }
 }
