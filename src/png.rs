@@ -130,7 +130,7 @@ impl TryFrom<&[u8]> for Png {
 }
 
 impl Display for Png {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
         let _ = write!(f, "{:?}\n", self.header).unwrap();
         self.chunks().iter().for_each(|chunk| write!(f, "{:?}\n", chunk.data()).unwrap());
         return Ok(());
